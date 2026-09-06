@@ -3,87 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor NFC Avançado</title>
+    <title>Visualizador de Arquivos NFC</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; display: flex; flex-direction: column; height: 90vh; }
-        button { padding: 15px; cursor: pointer; width: 100%; font-size: 1.2em; font-weight: bold; background: #007bff; color: white; border: none; border-radius: 5px; }
-        button:active { background: #0056b3; }
-        #view { flex-grow: 1; margin-top: 20px; padding: 15px; border: 2px dashed #ccc; background: #fafafa; overflow-y: auto; white-space: pre-wrap; }
+        body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+        header { padding: 10px; background: #007bff; color: white; display: flex; align-items: center; gap: 15px; }
+        #scanBtn { padding: 10px 20px; font-weight: bold; cursor: pointer; border: none; background: white; color: #007bff; border-radius: 4px; }
+        
+        /* Layout de duas colunas ocupando a tela inteira abaixo do topo */
+        #main { display: flex; flex: 1; overflow: hidden; }
+        #sidebar { width: 180px; background: #f4f4f4; border-right: 1px solid #ccc; overflow-y: auto; padding: 10px; }
+        #viewer { flex: 1; padding: 20px; overflow-y: auto; background: #fff; white-space: pre-wrap; }
+        
+        .file-item { padding: 10px; margin-bottom: 5px; background: white; border: 1px solid #ddd; cursor: pointer; border-radius: 4px; font-size: 0.9em; font-weight: bold; }
+        .file-item:hover { background: #e9e9e9; }
+        .active-file { background: #007bff !important; color: white; }
     </style>
 </head>
 <body>
 
-    <button id="readBtn">Escanear NFC</button>
+    <header>
+        <button id="scanBtn">Escanear NFC</button>
+        <span id="status">Aguardando leitura do chip...</span>
+    </header>
 
-    <div id="view">Aguardando leitura do chip...</div>
+    <div id="main">
+        <!-- Barra Lateral Esquerda -->
+        <div id="sidebar">
+            <h4 style="margin-top:0;">Lista de Arquivos</h4>
+            <div id="fileList" style="font-size: 0.9em; color: #666;">Nenhum chip lido.</div>
+        </div>
+        
+        <!-- Área de Visualização à Direita -->
+        <div id="viewer">O conteúdo do arquivo selecionado na barra lateral aparecerá aqui.</div>
+    </div>
 
     <script>
-        const readBtn = document.getElementById('readBtn');
-        const view = document.getElementById('view');
+        const scanBtn = document.getElementById('scanBtn');
+        const statusText = document.getElementById('status');
+        const fileList = document.getElementById('fileList');
+        const viewer = document.getElementById('viewer');
 
-        readBtn.addEventListener('click', async () => {
+        scanBtn.addEventListener('click', async () => {
             if (!('NDEFReader' in window)) {
-                alert("Web NFC não suportada (Use o Chrome no Android via HTTPS).");
+                alert("Web NFC não suportada neste dispositivo.");
                 return;
             }
 
             try {
-                view.innerHTML = "<b>Aproxime o chip para ler...</b>";
-                
+                statusText.textContent = "Aproxime a tag...";
                 const ndef = new NDEFReader();
                 await ndef.scan();
 
                 ndef.addEventListener("reading", ({ message }) => {
                     const decoder = new TextDecoder();
-
+                    
                     for (const record of message.records) {
                         if (record.recordType === "text") {
-                            const conteudo = decoder.decode(record.data);
+                            const stringBruta = decoder.decode(record.data);
+                            statusText.textContent = "Tag lida com sucesso!";
                             
-                            // Limpa a tela antes de processar
-                            view.innerHTML = "";
-                            view.textContent = "";
-
-                            // 1. Condicional para HTML
-                            if (conteúdo.startsWith("{html}=")) {
-                                const htmlPuro = conteúdo.replace("{html}=", "");
-                                view.innerHTML = htmlPuro;
-                            } 
-                            
-                            // 2. Condicional para JavaScript (Script)
-                            else if (conteúdo.startsWith("{script}=")) {
-                                const jsPuro = conteúdo.replace("{script}=", "");
-                                view.innerHTML = "<i>Executando script gravado no chip...</i>";
-                                try {
-                                    // Executa o script de forma segura no contexto global
-                                    const rodarScript = new Function(jsPuro);
-                                    rodarScript();
-                                } catch (e) {
-                                    view.innerHTML = `<span style="color:red">Erro no script: ${e.message}</span>`;
-                                }
-                            } 
-                            
-                            // 3. Condicional para Texto Puro ou caso não tenha prefixo conhecido
-                            else if (conteúdo.startsWith("{text}=")) {
-                                const textoPuro = conteúdo.replace("{text}=", "");
-                                view.textContent = textoPuro;
-                            } 
-                            
-                            // Fallback caso não use nenhum padrão
-                            else {
-                                view.textContent = conteúdo;
-                            }
-                            
-                        } else {
-                            view.textContent = "A tag contém dados que não são texto.";
+                            processarEExibirArquivos(stringBruta);
                         }
                     }
                 });
-
-            } catch (error) {
-                view.innerHTML = `<span style="color:red">Erro: ${error.message || error}</span>`;
+            } catch (e) {
+                statusText.textContent = `Erro: ${e.message || e}`;
             }
         });
+
+        function processarEExibirArquivos(dadosNfc) {
+            fileList.innerHTML = "";
+            viewer.innerHTML = "Selecione um arquivo na barra lateral para abrir.";
+
+            // Separa os blocos de arquivos salvos
+            const blocos = dadosNfc.split('||');
+
+            blocos.forEach((bloco, index) => {
+                // Divide o bloco em Nome, Tipo e Conteúdo
+                const componentes = bloco.split('::');
+                if (componentes.length < 3) return; // Evita erros se o bloco estiver corrompido
+
+                const name = componentes[0];
+                const type = componentes[1];
+                const content = componentes.slice(2).join('::'); // Junta o resto caso o conteúdo use "::" por acaso
+
+                // Cria o botão do arquivo na barra lateral
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerText = name;
+                
+                item.addEventListener('click', () => {
+                    // Atualiza destaque visual na barra lateral
+                    document.querySelectorAll('.file-item').forEach(i => i.classList.remove('active-file'));
+                    item.classList.add('active-file');
+
+                    // Reseta os campos de exibição
+                    viewer.innerHTML = "";
+                    viewer.textContent = "";
+
+                    // Executa ou exibe baseado no tipo mapeado
+                    if (type === 'html') {
+                        viewer.innerHTML = content;
+                    } else if (type === 'script') {
+                        viewer.innerHTML = "<i>Executando script do arquivo...</i>";
+                        try {
+                            const rodar = new Function(content);
+                            rodar();
+                        } catch (err) {
+                            viewer.innerHTML = `<span style="color:red">Erro no script: ${err.message}</span>`;
+                        }
+                    } else {
+                        // Modo Texto Puro
+                        viewer.textContent = content;
+                    }
+                });
+
+                fileList.appendChild(item);
+            });
+        }
     </script>
 </body>
 </html>

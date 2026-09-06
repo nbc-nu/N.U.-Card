@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualizador de Arquivos NFC</title>
+    <title>N.U. Card - Read</title>
     <style>
         body { font-family: sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
         header { padding: 10px; background: #007bff; color: white; display: flex; align-items: center; gap: 15px; }
@@ -22,19 +22,19 @@
 <body>
 
     <header>
-        <button id="scanBtn">Escanear NFC</button>
-        <span id="status">Aguardando leitura do chip...</span>
+        <button id="scanBtn">Ler N.U. Card</button>
+        <span id="status">Aguardando um N.U. card</span>
     </header>
 
     <div id="main">
         <!-- Barra Lateral Esquerda -->
         <div id="sidebar">
-            <h4 style="margin-top:0;">Lista de Arquivos</h4>
-            <div id="fileList" style="font-size: 0.9em; color: #666;">Nenhum chip lido.</div>
+            <h4 style="margin-top:0;">Arquivos</h4>
+            <div id="fileList" style="font-size: 0.9em; color: #666;">Nenhum N.U. card lido.</div>
         </div>
         
         <!-- Área de Visualização à Direita -->
-        <div id="viewer">O conteúdo do arquivo selecionado na barra lateral aparecerá aqui.</div>
+        <div id="viewer">O conteudo do arquivo aparecera aqui...</div>
     </div>
 
     <script>
@@ -50,7 +50,7 @@
             }
 
             try {
-                statusText.textContent = "Aproxime a tag...";
+                statusText.textContent = "Aproxime seu N.U. card";
                 const ndef = new NDEFReader();
                 await ndef.scan();
 
@@ -60,7 +60,7 @@
                     for (const record of message.records) {
                         if (record.recordType === "text") {
                             const stringBruta = decoder.decode(record.data);
-                            statusText.textContent = "Tag lida com sucesso!";
+                            statusText.textContent = "N.U. card lido com sucesso!";
                             
                             processarEExibirArquivos(stringBruta);
                         }
@@ -105,12 +105,12 @@
                     if (type === 'html') {
                         viewer.innerHTML = content;
                     } else if (type === 'script') {
-                        viewer.innerHTML = "<i>Executando script do arquivo...</i>";
+                        viewer.innerHTML = "<i>Executando...</i>";
                         try {
                             const rodar = new Function(content);
                             rodar();
                         } catch (err) {
-                            viewer.innerHTML = `<span style="color:red">Erro no script: ${err.message}</span>`;
+                            viewer.innerHTML = `<span style="color:red">Script Error: ${err.message}</span>`;
                         }
                     } else {
                         // Modo Texto Puro

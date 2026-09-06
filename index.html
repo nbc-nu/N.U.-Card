@@ -3,52 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gravar NFC</title>
+    <title>Gravar Múltiplos Arquivos no NFC</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; }
-        textarea { width: 100%; height: 120px; }
-        .info { margin: 10px 0; font-size: 0.9em; }
+        body { font-family: sans-serif; margin: 20px; max-width: 500px; }
+        .file-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background: #fafafa; }
+        select, input, textarea { width: 100%; margin-bottom: 8px; box-sizing: border-box; }
+        textarea { height: 60px; }
+        button { padding: 10px; cursor: pointer; margin-right: 5px; }
+        .info { margin: 15px 0; font-size: 0.9em; }
         .danger { color: red; font-weight: bold; }
         .success { color: green; font-weight: bold; }
-        button { padding: 12px; cursor: pointer; }
         #log { background: #eee; padding: 10px; margin-top: 15px; border: 1px solid #ccc; }
     </style>
 </head>
 <body>
 
-    <h2>Escrita - NXP Ultralight</h2>
-    
-    <textarea id="content" placeholder="Insira o texto ou HTML curto..."></textarea>
-    
+    <h2>Criar Pacote de Arquivos</h2>
+    <div id="filesContainer"></div>
+
+    <button id="addFileBtn">+ Adicionar Arquivo</button>
+
     <div class="info">
-        Bytes: <span id="byteCount">0</span> / 132 bytes úteis
+        Tamanho Total Combinado: <span id="byteCount">0</span> / 132 bytes úteis
         <div id="warning" class="success">Cabe no chip!</div>
     </div>
 
-    <button id="writeBtn">Salvar no NFC</button>
+    <button id="writeBtn" style="background:#28a745; color:white; font-weight:bold;">Salvar Todos no NFC</button>
 
     <h3>Status:</h3>
-    <div id="log">Aguardando comando...</div>
+    <div id="log">Aguardando ações...</div>
 
     <script>
-        const contentArea = document.getElementById('content');
+        const container = document.getElementById('filesContainer');
         const byteCountSpan = document.getElementById('byteCount');
         const warningDiv = document.getElementById('warning');
         const writeBtn = document.getElementById('writeBtn');
         const logDiv = document.getElementById('log');
 
-        const MAX_BYTES = 132; 
+        const MAX_BYTES = 132;
 
         function getByteSize(str) {
             return new TextEncoder().encode(str).length;
         }
 
-        contentArea.addEventListener('input', () => {
-            const size = getByteSize(contentArea.value);
+        function buildDataString() {
+            const boxes = document.querySelectorAll('.file-box');
+            let partes = [];
+            
+            boxes.forEach(box => {
+                const name = box.querySelector('.file-name').value || "arq";
+                const type = box.querySelector('.file-type').value;
+                const content = box.querySelector('.file-content').value || "";
+                // Formato: nome::tipo::conteúdo
+                partes.push(`${name}::${type}::${content}`);
+            });
+
+            // Une todos os arquivos usando || como separador
+            return partes.join('||');
+        }
+
+        function validarTamanho() {
+            const stringFinal = buildDataString();
+            const size = getByteSize(stringFinal);
             byteCountSpan.textContent = size;
 
             if (size > MAX_BYTES) {
-                warningDiv.textContent = "Atenção: Não vai caber no chip NXP Ultralight!";
+                warningDiv.textContent = "Atenção: O total de todos os arquivos passou do limite do chip!";
                 warningDiv.className = "danger";
                 writeBtn.disabled = true;
             } else {
@@ -56,23 +76,56 @@
                 warningDiv.className = "success";
                 writeBtn.disabled = false;
             }
-        });
+        }
+
+        function createFileForm() {
+            const div = document.createElement('div');
+            div.className = 'file-box';
+            div.innerHTML = `
+                <input type="text" placeholder="Nome do arquivo (curto)" class="file-name" required>
+                <select class="file-type">
+                    <option value="text">Texto Puro</option>
+                    <option value="html">HTML</option>
+                    <option value="script">Script JS</option>
+                </select>
+                <textarea placeholder="Conteúdo..." class="file-content"></textarea>
+                <button type="button" class="remove-btn" style="background:#dc3545; color:white; padding:3px 8px; font-size:0.8em;">Remover</button>
+            `;
+            
+            // Ouvintes de evento para recalcular o tamanho a cada alteração
+            div.querySelector('.file-name').addEventListener('input', validarTamanho);
+            div.querySelector('.file-type').addEventListener('change', validarTamanho);
+            div.querySelector('.file-content').addEventListener('input', validarTamanho);
+            
+            div.querySelector('.remove-btn').addEventListener('click', () => {
+                div.remove();
+                validarTamanho();
+            });
+
+            container.appendChild(div);
+            validarTamanho();
+        }
+
+        // Inicializa com o primeiro arquivo na tela
+        createFileForm();
+        document.getElementById('addFileBtn').addEventListener('click', createFileForm);
 
         writeBtn.addEventListener('click', async () => {
             if (!('NDEFReader' in window)) {
-                alert("Web NFC não suportada (Use o Chrome no Android via HTTPS).");
+                alert("Web NFC não suportada.");
                 return;
             }
 
             try {
-                logDiv.textContent = "Aproxime o chip NFC para salvar...";
-                const ndef = new NDEFReader();
+                const dadosParaGravar = buildDataString();
+                logDiv.textContent = "Aproxime o chip NFC para salvar o pacote...";
                 
+                const ndef = new NDEFReader();
                 await ndef.write({
-                    records: [{ recordType: "text", data: contentArea.value }]
+                    records: [{ recordType: "text", data: dadosParaGravar }]
                 });
 
-                logDiv.textContent = "🎉 Salvo com sucesso no NXP Ultralight!";
+                logDiv.textContent = "🎉 Todos os arquivos foram salvos juntos dentro do chip!";
             } catch (error) {
                 logDiv.textContent = `Erro ao salvar: ${error}`;
             }

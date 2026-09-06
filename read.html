@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ler NFC</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        button { padding: 12px; cursor: pointer; width: 100%; font-size: 1.1em; }
+        .box { background: #eee; padding: 10px; margin-top: 15px; border: 1px solid #ccc; white-space: pre-wrap; }
+        .render-box { background: #fff; padding: 10px; margin-top: 15px; border: 2px dashed #4CAF50; min-height: 50px; }
+    </style>
+</head>
+<body>
+
+    <h2>Leitura - NXP Ultralight</h2>
+    
+    <button id="readBtn">Visualizar/Ler NFC</button>
+
+    <h3>Texto Puro (Código Lido):</h3>
+    <div id="logText" class="box">Nenhum dado lido ainda.</div>
+
+    <h3>HTML Interpretado (Visual):</h3>
+    <div id="logRender" class="render-box">O HTML renderizado aparecerá aqui.</div>
+
+    <script>
+        const readBtn = document.getElementById('readBtn');
+        const logText = document.getElementById('logText');
+        const logRender = document.getElementById('logRender');
+
+        readBtn.addEventListener('click', async () => {
+            if (!('NDEFReader' in window)) {
+                alert("Web NFC não suportada (Use o Chrome no Android via HTTPS).");
+                return;
+            }
+
+            try {
+                logText.textContent = "Aproxime o chip para ler...";
+                logRender.textContent = "Aguardando aproximação...";
+                
+                const ndef = new NDEFReader();
+                await ndef.scan();
+
+                ndef.addEventListener("reading", ({ message }) => {
+                    const decoder = new TextDecoder();
+
+                    for (const record of message.records) {
+                        if (record.recordType === "text") {
+                            const textoLido = decoder.decode(record.data);
+                            
+                            // 1. Mostra o texto bruto na caixa cinza (código)
+                            logText.innerText = textoLido;
+                            
+                            // 2. Renderiza o HTML na caixa com borda verde
+                            logRender.innerHTML = textoLido;
+                            
+                        } else {
+                            logText.textContent = "A tag contém dados que não são texto.";
+                        }
+                    }
+                });
+
+            } catch (error) {
+                logText.textContent = `Erro ao ler: ${error}`;
+                logRender.textContent = "Erro na leitura.";
+            }
+        });
+    </script>
+</body>
+</html>
